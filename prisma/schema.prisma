@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Preset {
+  id        Int      @id @default(autoincrement())
+  name      String
+  metadata  Json?
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Chat {
+  id            Int      @id @default(autoincrement())
+  name          String
+  metadata      Json?
+  content       Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Prompt {
+  id        Int      @id @default(autoincrement())
+  name      String
+  metadata  Json?
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
