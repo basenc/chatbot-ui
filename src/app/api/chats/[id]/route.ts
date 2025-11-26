@@ -47,7 +47,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json()
-    const { message } = body
+    const { messages } = body
 
     const chat = await prisma.chat.findUnique({
       where: {
@@ -81,12 +81,11 @@ export async function POST(
     };
 
     const openai = new OpenAI({ apiKey, baseURL: apiBase })
-    const messages: ChatCompletionMessage[] = chat.content as unknown as ChatCompletionMessage[];
-    messages.push(message)
+    const messagesForOpenAI: ChatCompletionMessage[] = messages as unknown as ChatCompletionMessage[];
 
     const stream = await openai.chat.completions.create({
       model,
-      messages,
+      messages: messagesForOpenAI,
       stream: true,
       body: {
         modalities: ['image', 'text']

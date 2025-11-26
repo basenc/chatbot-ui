@@ -4,6 +4,23 @@ import nextTs from "eslint-config-next/typescript";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    languageOptions: {
+      parserOptions: {
+        project: "./tsconfig.json",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/consistent-type-assertions": [
+        "warn",
+        { assertionStyle: "never" },
+      ],
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([

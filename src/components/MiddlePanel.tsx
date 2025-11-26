@@ -14,7 +14,7 @@ import {
   InputGroupAddon,
   InputGroupButton,
 } from "./ui/input-group";
-import { Send, Paperclip, ImageOff } from "lucide-react";
+import { Send, Paperclip } from "lucide-react";
 import { chatStore, chatsStore } from "@/lib/store";
 import { Item, ItemContent } from "./ui/item";
 import ReactMarkdown from "react-markdown";
@@ -23,142 +23,39 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "./ui/collapsible";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import remarkEmoji from "remark-emoji";
-import rehypeHighlight from "rehype-highlight";
-import rehypeRaw from "rehype-raw";
-import rehypeKatex from "rehype-katex";
-import "highlight.js/styles/github.css";
-import "katex/dist/katex.min.css";
 import { toast } from "sonner";
-import mermaid from "mermaid";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-function MermaidRenderer({ chart }: { chart: string }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        mermaid.initialize({ startOnLoad: false, theme: "neutral" });
-        if (!mounted || !ref.current) return;
-        const id = "mermaid-" + Math.random().toString(36).slice(2, 9);
-        try {
-          const { svg } = await mermaid.render(id, chart);
-          if (mounted && ref.current) ref.current.innerHTML = svg;
-        } catch (e) {
-          console.error("Mermaid render failed", e);
-          toast.error(
-            "Failed to render mermaid diagram. Displaying as plain text."
-          );
-          if (mounted && ref.current) ref.current.textContent = chart;
-        }
-      } catch (e) {
-        console.error("Failed to load mermaid", e);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [chart]);
+import MarkdownRenderer from "./MarkdownRenderer";
+import ImageWithPlaceholder from "./ImageWithPlaceholder";
+import { Spinner } from "./ui/spinner";
 
-  return <div ref={ref} className="overflow-auto" />;
-}
-
-function ImageWithPlaceholder(props: React.ComponentProps<"img">) {
-  const { src, alt, ...rest } = props;
-  const [hasError, setHasError] = useState(false);
-
-  if (!src)
-    return (
-      <span
-        className="inline-flex mt-4 mb-4 w-30 h-30 aspect-square
-        rounded-md bg-secondary items-center justify-center"
-      >
-        <ImageOff className="size-4 text-muted-foreground" />
-      </span>
-    );
-
-  return hasError ? (
-    <span
-      className="inline-flex mt-4 mb-4 w-30 h-30 aspect-square rounded-md
-      bg-secondary items-center justify-center"
-    >
-      <ImageOff className="size-4 text-muted-foreground" />
-    </span>
-  ) : (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      {...rest}
-      onError={() => setHasError(true)}
-      className="max-w-96 max-h-96 rounded-md mt-4 mb-4"
-    />
-  );
-}
+type ContentPart = { type: "text" | "image_url"; text?: string; image_url?: { url: string }; }
+type MessageContent = string | ContentPart[]
 
 interface Message {
   role?: "user" | "assistant";
-  content?: string;
+  content?: MessageContent;
   reasoning?: string;
   images?: Array<{ image_url?: { url?: string } }>;
 }
-
 export default function MiddlePanel() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState<{ text: string; images: ContentPart[] }>({ text: "", images: [] });
   const [messages, setMessages] = useState<Message[]>([]);
-  const [settings, setSettings] = useState<{
-    openai_api_base?: string;
-    openai_api_key?: string;
-  }>({});
   const [isStreaming, setIsStreaming] = useState(false);
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
   const currentChatId = useSyncExternalStore(
     chatStore.subscribe,
     chatStore.getSnapshot,
     chatStore.getServerSnapshot
   );
   const messagesRef = useRef<Message[]>(messages);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => res.json())
-      .then(setSettings)
-      .catch((err) => {
-        console.error("Failed to fetch settings", err);
-        toast.error("Failed to load settings");
-      });
-  }, []);
-
-  useEffect(() => {
-    if (currentChatId) {
+    if (currentChatId && currentChatId > 0) {
       fetch(`/api/chats/${currentChatId}`)
         .then((res) => res.json())
-        .then((chat: { content: Array<Record<string, unknown>> }) => {
-          if (chat.content && Array.isArray(chat.content)) {
-            setMessages(
-              chat.content.map((m) => {
-                return {
-                  content: m.content as string,
-                  reasoning: m.reasoning as string,
-                  images: m.images as Array<{ image_url?: { url?: string } }>,
-                };
-              })
-            );
-          } else {
-            setMessages([]);
-          }
+        .then((chat: { content: Message[] }) => {
+          setMessages(chat.content);
         })
         .catch((err) => {
           console.error("Failed to fetch chat", err);
@@ -199,19 +96,18 @@ export default function MiddlePanel() {
   }
 
   const handleSend = async () => {
-    if (!input.trim() || currentChatId == null || !settings.openai_api_key) return;
+    if (isStreaming || (!input.text.trim() && input.images.length === 0) || currentChatId == null) return;
 
-    const userContent = input;
+    const userContent = input.text.trim() ? [{ type: "text" as const, text: input.text }, ...input.images] : input.images;
 
-    // Add the user's message to state and ref
     setMessages((prev) => {
-      const next = [...prev, { role: 'user' as const, content: input }];
+      const next = [...prev, { role: 'user' as const, content: userContent }];
       messagesRef.current = next;
       return next;
     });
-    setInput("");
+    setInput({ text: "", images: [] });
 
-    let activeChatId = currentChatId as number;
+    let activeChatId = currentChatId;
     if (messagesRef.current.length === 1 && currentChatId && currentChatId < 0) {
       try {
         const createResp = await fetch(`/api/chats/new`, {
@@ -239,58 +135,79 @@ export default function MiddlePanel() {
     }
 
     if (messagesRef.current.length === 1) {
-      try {
-        console.debug('Requesting generated title', { chatId: activeChatId, message: userContent });
-        const titleResponse = await fetch(`/api/chats/${activeChatId}/title`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: userContent }),
-        });
+      fetch(`/api/chats/${activeChatId}/title`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input.text }),
+      }).then(titleResponse => {
         if (titleResponse.ok) {
-          const { name } = await titleResponse.json();
-          chatsStore.set(chatsStore.getSnapshot().map(c => (c.id === activeChatId ? { ...c, name } : c)));
+          titleResponse.json().then(({ name }) => {
+            chatsStore.set(chatsStore.getSnapshot().map(c => (c.id === activeChatId ? { ...c, name } : c)));
+          });
         } else {
-          console.warn('Title generation endpoint returned non-OK', await titleResponse.text());
+          console.warn('Title generation endpoint returned non-OK', titleResponse.text());
         }
-      } catch (err) {
+      }).catch(err => {
         console.error('Failed to generate title', err);
-      }
+      });
     }
+
+    // show a typing indicator separate from messages
+    setShowTypingIndicator(true);
+    setIsStreaming(true);
 
     try {
       const response = await fetch(`/api/chats/${activeChatId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: { role: "user", content: userContent },
+          messages: messagesRef.current,
         }),
       });
 
       if (!response.ok) throw new Error(await response.text());
-
-      const reader = response.body!.getReader();
-      const assistantMessage: Message = { role: 'assistant' as const };
-      const localMessages = [...messagesRef.current, assistantMessage];
-      setIsStreaming(true);
+      if (!response.body) throw new Error('Response has no body');
+      const reader = response.body.getReader();
+      let assistantMessage: Message | null = null;
+      let localMessages: Message[] = messagesRef.current.slice();
 
       for await (const delta of parseStream(reader)) {
+        if (!assistantMessage) {
+          // first chunk: create assistant message and append
+          assistantMessage = { role: 'assistant' };
+          localMessages = [...messagesRef.current, assistantMessage];
+          setMessages(localMessages);
+          messagesRef.current = localMessages;
+          // hide typing indicator once we append the actual assistant message
+          setShowTypingIndicator(false);
+        }
+
         if (delta.content) {
           assistantMessage.content = (assistantMessage.content || '') + delta.content;
         }
         if (delta.reasoning) {
+          // keep reasoning under the reasoning field so Collapsible works
           assistantMessage.reasoning = (assistantMessage.reasoning || '') + delta.reasoning;
         }
-        if (delta.images && Array.isArray(delta.reasoning_details) && delta.reasoning_details.length === 0) {
-          const images = Array.isArray(delta.images)
-            ? (delta.images as Partial<{ image_url?: { url?: string } }>[])
-              .filter(img => typeof img?.image_url?.url === "string")
-            : [];
-          assistantMessage.images = (assistantMessage.images || []).concat(images);
+        // delta.reasoning_details to prevent receiving duplicate images from gemini responses
+        if (delta.images && Array.isArray(delta.images) && delta.reasoning_details && Array.isArray(delta.reasoning_details) && delta.reasoning_details.length === 0) {
+          assistantMessage.images = (assistantMessage.images || []).concat(delta.images);
         }
-        setMessages([...localMessages]);
-        messagesRef.current = [...localMessages];
+
+        // update the last message in place (immutably)
+        if (assistantMessage) {
+          const msgToWrite: Message = assistantMessage;
+          setMessages(prev => {
+            const next = prev.slice();
+            next[next.length - 1] = msgToWrite;
+            messagesRef.current = next;
+            return next;
+          });
+        }
       }
 
+      // ensure typing indicator is hidden when stream completes
+      setShowTypingIndicator(false);
       setIsStreaming(false);
 
       await fetch(`/api/chats/${activeChatId}`, {
@@ -300,14 +217,37 @@ export default function MiddlePanel() {
       });
     } catch (error) {
       console.error("Send failed:", error);
+      // hide typing indicator; keep messages intact
+      setShowTypingIndicator(false);
       toast.error("Failed to send message");
     } finally {
       setIsStreaming(false);
+      setShowTypingIndicator(false);
     }
   };
 
+  const addImageFromFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (result && typeof result === 'string') {
+        setInput(prev => ({ ...prev, images: [...prev.images, { type: "image_url", image_url: { url: result } }] }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAttach = () => {
-    // noop for now
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = async () => {
+      if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        addImageFromFile(file);
+      }
+    };
+    fileInput.click();
   };
 
   return (
@@ -317,147 +257,39 @@ export default function MiddlePanel() {
           <Item key={idx}>
             <ItemContent className="p-4 border rounded-md border-border">
               {msg.content && (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath, remarkEmoji]}
-                  rehypePlugins={[rehypeHighlight, rehypeKatex, rehypeRaw]}
-                  components={{
-                    h1: ({ ...props }) => (
-                      <h1 {...props} className="text-5xl font-bold mb-2 mt-4" />
-                    ),
-                    h2: ({ ...props }) => (
-                      <h2 {...props} className="text-4xl font-bold mb-2 mt-4" />
-                    ),
-                    h3: ({ ...props }) => (
-                      <h3 {...props} className="text-3xl font-bold mb-2 mt-4" />
-                    ),
-                    h4: ({ ...props }) => (
-                      <h4 {...props} className="text-2xl font-bold mb-2 mt-3" />
-                    ),
-                    h5: ({ ...props }) => (
-                      <h5 {...props} className="text-xl font-bold mb-2 mt-2" />
-                    ),
-                    h6: ({ ...props }) => (
-                      <h6 {...props} className="text-lg font-bold mb-2 mt-2" />
-                    ),
-                    pre: ({ children, ...props }) => {
-                      if (
-                        React.isValidElement(children) &&
-                        children.type === "code" &&
-                        (
-                          children.props as { className?: string }
-                        ).className?.includes("language-mermaid")
-                      ) {
-                        return (
-                          <MermaidRenderer
-                            chart={String(
-                              (children.props as { children: React.ReactNode })
-                                .children
-                            )}
-                          />
-                        );
-                      }
-                      return (
-                        <pre {...props} className="p-4 bg-muted rounded-md">
-                          {children}
-                        </pre>
-                      );
-                    },
-                    code: ({ children, className, ...props }) => {
-                      if (className?.includes("language-mermaid")) {
-                        return <MermaidRenderer chart={String(children)} />;
-                      }
-                      return <code {...props}>{children}</code>;
-                    },
-                    table: ({ children, ...props }) => (
-                      <Table {...props}>{children}</Table>
-                    ),
-                    thead: ({ children, ...props }) => (
-                      <TableHeader {...props}>{children}</TableHeader>
-                    ),
-                    tbody: ({ children, ...props }) => (
-                      <TableBody {...props}>{children}</TableBody>
-                    ),
-                    tr: ({ children, ...props }) => (
-                      <TableRow {...props}>{children}</TableRow>
-                    ),
-                    th: ({ children, ...props }) => (
-                      <TableHead {...props}>{children}</TableHead>
-                    ),
-                    td: ({ children, ...props }) => (
-                      <TableCell {...props}>{children}</TableCell>
-                    ),
-                    blockquote: ({ children, ...props }) => (
-                      <blockquote
-                        {...props}
-                        className="border-l-2 border-primary pl-4"
-                      >
-                        {children}
-                      </blockquote>
-                    ),
-                    ul: ({ children, ...props }) => (
-                      <ul {...props} className="list-disc ml-4">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children, ...props }) => (
-                      <ol {...props} className="list-decimal ml-4">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children, ...props }) => (
-                      <li {...props}>{children}</li>
-                    ),
-                    img: (props) => <ImageWithPlaceholder {...props} />,
-                    a: ({ href, children, ...props }) => {
-                      let faviconUrl = null;
-                      try {
-                        if (href && href.startsWith("http")) {
-                          const hostname = new URL(href).hostname;
-                          faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=16`;
-                        }
-                      } catch {
-                        // Invalid URL, no favicon
-                      }
-                      return (
-                        <a
-                          {...props}
-                          href={href}
-                          className="text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-1"
-                        >
-                          {faviconUrl && (
-                            <Image
-                              src={faviconUrl}
-                              alt=""
-                              width={16}
-                              height={16}
-                              className="shrink-0"
-                              onError={() => { }}
-                              unoptimized
-                            />
-                          )}
-                          {children}
-                        </a>
-                      );
-                    },
-                    video: ({ ...props }) => <video {...props} controls />,
-                    audio: ({ ...props }) => <audio {...props} controls />,
-                  }}
-                >
-                  {msg.content as string}
-                </ReactMarkdown>
+                typeof msg.content === 'string' ? (
+                  <MarkdownRenderer content={msg.content} />
+                ) : (
+                  <>
+                    {(() => {
+                      const textPart = msg.content.find(c => c.type === "text");
+                      return textPart?.text ? <MarkdownRenderer content={textPart.text} /> : null;
+                    })()}
+                    {msg.content.filter(c => c.type === "image_url").map((c, i) => (
+                      c.image_url?.url ? (
+                        <ImageWithPlaceholder
+                          key={i}
+                          src={c.image_url.url}
+                        />
+                      ) : null
+                    ))}
+                  </>
+                )
               )}
               {msg.reasoning && msg.reasoning.length > 0 && (
                 <Collapsible defaultOpen={!isStreaming}>
                   <CollapsibleTrigger className="w-full text-left text-sm text-muted-foreground underline">
-                    {((!msg.content || msg.content.trim() === "") && (!msg.images || msg.images.length === 0)) ?
-                      msg.reasoning.trim().split("\n").slice(-1)[0]
-                      :
-                      "Show Reasoning"
-                    }
+                    {(() => {
+                      const isContentEmpty = !msg.content || (typeof msg.content === 'string' ? msg.content.trim() === "" : !msg.content.some(c => c.type === "text" && c.text?.trim()) && !msg.content.some(c => c.type === "image_url"));
+                      return isContentEmpty && (!msg.images || msg.images.length === 0) ?
+                        msg.reasoning.trim().split("\n").slice(-1)[0]
+                        :
+                        "Show Reasoning";
+                    })()}
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <ReactMarkdown>
-                      {msg.reasoning as string}
+                      {msg.reasoning}
                     </ReactMarkdown>
                   </CollapsibleContent>
                 </Collapsible>
@@ -465,34 +297,71 @@ export default function MiddlePanel() {
               {msg.images && Array.isArray(msg.images) &&
                 msg.images.map(
                   (img, i) =>
-                    img.image_url?.url && (
-                      <ImageWithPlaceholder key={i} src={img.image_url.url} />
-                    )
+                    img.image_url?.url ? (
+                      <ImageWithPlaceholder
+                        key={i}
+                        src={img.image_url.url}
+                      />
+                    ) : null
                 )}
             </ItemContent>
           </Item>
         ))}
+        {showTypingIndicator && (
+          <Item key="typing-indicator">
+            <ItemContent className="p-4 border rounded-md border-border">
+              <div className="flex items-center gap-2">
+                <Spinner className="size-4" />
+                <span className="text-muted-foreground">Assistant is thinking...</span>
+              </div>
+            </ItemContent>
+          </Item>
+        )}
         {/* Spacer so the chat can be scrolled past the bottom and input doesn't overlap the last message */}
         <div className="h-36 md:h-40" />
       </ScrollArea>
       <div className="absolute bottom-0 left-0 right-0 p-4 pt-16 bg-linear-to-t from-background via-background/50 to-transparent">
         <InputGroup className="shadow-none bg-background">
           <InputGroupInput
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={input.text}
+            onChange={(e) => setInput(prev => ({ ...prev, text: e.target.value }))}
             placeholder="Type a message..."
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onPaste={(e) => {
+              const items = e.clipboardData.items;
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                  const file = items[i].getAsFile();
+                  if (file) {
+                    addImageFromFile(file);
+                  }
+                }
+              }
+            }}
             className="border-t-0"
+            disabled={isStreaming}
           />
           <InputGroupAddon align="inline-end">
             <InputGroupButton size="icon-xs" onClick={handleAttach}>
               <Paperclip className="size-4" />
             </InputGroupButton>
-            <InputGroupButton size="icon-xs" onClick={handleSend}>
+            <InputGroupButton size="icon-xs" onClick={handleSend} disabled={isStreaming}>
               <Send className="size-4" />
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
+        {input.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {input.images.map((img, idx) => (
+              img.image_url?.url ? (
+                <div key={idx} className="relative">
+                  <Image src={img.image_url.url} alt="" width={100} height={100} className="rounded" unoptimized />
+                  <button onClick={() => setInput(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }))} className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">x</button>
+                </div>
+              ) : null
+            ))}
+          </div>
+        )}
       </div>
     </div >
   );

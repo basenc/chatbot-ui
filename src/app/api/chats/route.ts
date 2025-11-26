@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const chats = await prisma.chat.findMany({
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: 'asc'
       }
     })
     return NextResponse.json(chats)
