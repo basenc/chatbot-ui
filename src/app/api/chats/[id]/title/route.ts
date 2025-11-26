@@ -36,7 +36,7 @@ export async function POST(
     }
 
     const openai = new OpenAI({ apiKey, baseURL: apiBase })
-    const titlePrompt = `Generate a short, concise title (max 50 characters) for this chat based on the user's first message: "${message}"`
+    const titlePrompt = `Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title': "${message}"`
 
     const response = await openai.chat.completions.create({
       model: taskModel,

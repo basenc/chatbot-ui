@@ -472,6 +472,8 @@ export default function MiddlePanel() {
             </ItemContent>
           </Item>
         ))}
+        {/* Spacer so the chat can be scrolled past the bottom and input doesn't overlap the last message */}
+        <div className="h-36 md:h-40" />
       </ScrollArea>
       <div className="absolute bottom-0 left-0 right-0 p-4 pt-16 bg-linear-to-t from-background via-background/50 to-transparent">
         <InputGroup className="shadow-none bg-background">
