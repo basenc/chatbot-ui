@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { ChatModel } from "../../prisma/prisma/models/Chat";
+import { ChatData } from "./odm";
 
 export function createStore<T>(initialValue: T) {
   let state = initialValue;
@@ -20,8 +20,5 @@ export function createStore<T>(initialValue: T) {
   };
 }
 
-export const chatStore = createStore<number | null>(null);
-export const presetStore = createStore<string | null>(null);
-export const promptStore = createStore<string | null>(null);
-export const messagesStore = createStore<Array<{ text: string; sender: string }>>([]);
-export const chatsStore = createStore<Array<ChatModel>>([]);
+export const chatIDStore = createStore<number | null>(null);
+export const chatsStore = createStore<Array<ChatData>>([]);

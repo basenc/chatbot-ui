@@ -1,15 +1,15 @@
 "use client";
 
-import dynamic from 'next/dynamic';
-import LeftPanel from '@/components/LeftPanel';
-import RightPanel from '@/components/RightPanel';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
+import dynamic from 'next/dynamic';
 const MiddlePanel = dynamic(() => import('@/components/MiddlePanel'), { ssr: false });
+const LeftPanel = dynamic(() => import('@/components/LeftPanel'), { ssr: false });
+const RightPanel = dynamic(() => import('@/components/RightPanel'), { ssr: false });
 
 export default function Home() {
   return (
-    <ResizablePanelGroup direction="horizontal" className="min-h-screen h-screen w-full">
+    <ResizablePanelGroup direction="horizontal" className="h-screen w-screen">
       <ResizablePanel defaultSize={20} minSize={20}>
         <LeftPanel />
       </ResizablePanel>
