@@ -31,9 +31,12 @@ export default function LeftPanel() {
 
   const handleNewChat = async () => {
     try {
-      const chat = new Chat({ name: generateChatName(), messages: [], metadata: {} });
-      chatsStore.set([...chats, chat]);
-      chatIDStore.set(chat.id);
+      const chat = new Chat({ name: generateChatName(), messages: [], metadata: {} }, {
+        onCreated: (id) => {
+          chatsStore.set([...chats, chat]);
+          chatIDStore.set(id);
+        }
+      });
     } catch (error) {
       console.error("Failed to create new chat:", error);
       ToastErrDetail({ mes: "Failed to create new chat.", error: String(error) });

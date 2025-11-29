@@ -30,6 +30,7 @@ import ImageWithPlaceholder from "./ImageWithPlaceholder";
 import { Spinner } from "./ui/spinner";
 import { Message } from "@/types/openai";
 import { chatCompletion } from "@/lib/utils";
+import { trimObject } from "@/lib/utils";
 
 export default function MiddlePanel() {
   const [input, setInput] = useState<Message>({ content: "", images: [], role: "user" });
@@ -55,7 +56,12 @@ export default function MiddlePanel() {
   }, [currentChatId]);
 
   const handleSend = async () => {
-    if (isStreaming || (!input.content && input.images?.length === 0) || currentChatId == null) return;
+    if (isStreaming || (!input.content && input.images?.length === 0)) return;
+
+    if (!currentChatId) {
+      toast.error("Select or create a chat first");
+      return;
+    }
 
     const chat = chatsCache.get(String(currentChatId));
     if (!chat) throw new Error(`Chat with id ${currentChatId} not found`);
@@ -86,6 +92,7 @@ export default function MiddlePanel() {
       messagesRef.current = [...messagesRef.current, acc];
       for await (const delta of response) {
         if (delta.content) {
+          setShowTypingIndicator(false);
           acc.content = (acc.content || '') + delta.content;
         }
         if (delta.reasoning) {
@@ -93,14 +100,13 @@ export default function MiddlePanel() {
         }
         // delta.reasoning_details to prevent receiving duplicate images from gemini responses
         if (delta.images && Array.isArray(delta.images) && delta.reasoning_details && Array.isArray(delta.reasoning_details) && delta.reasoning_details.length === 0) {
-          acc.images = [...(acc.images || []), [...delta.images]];
+          setShowTypingIndicator(false);
+          acc.images = [...(acc.images || []), ...delta.images];
         }
 
-        setShowTypingIndicator(false);
         setMessages([...messagesRef.current]);
       }
-
-      setIsStreaming(false);
+      console.log(trimObject(acc));
 
       chat.update({ messages: messagesRef.current });
     } catch (error) {
@@ -166,13 +172,17 @@ export default function MiddlePanel() {
               {msg.reasoning && msg.reasoning.length > 0 && (
                 <Collapsible defaultOpen={!isStreaming}>
                   <CollapsibleTrigger className="w-full text-left text-sm text-muted-foreground underline">
-                    {(() => {
-                      const isContentEmpty = !msg.content || (typeof msg.content === 'string' ? msg.content.trim() === "" : !msg.content.some(c => c.type === "text" && c.text?.trim()) && !msg.content.some(c => c.type === "image_url"));
-                      return isContentEmpty && (!msg.images || msg.images.length === 0) ?
-                        msg.reasoning.trim().split("\n").slice(-1)[0]
-                        :
-                        "Show Reasoning";
-                    })()}
+                    <div className="flex items-center justify-between">
+                      <span>
+                        {(() => {
+                          const isContentEmpty = !msg.content || (typeof msg.content === 'string' ? msg.content.trim() === "" : !msg.content.some(c => c.type === "text" && c.text?.trim()) && !msg.content.some(c => c.type === "image_url"));
+                          return isContentEmpty && (!msg.images || msg.images.length === 0) ?
+                            msg.reasoning.trim().split("\n").slice(-1)[0]
+                            :
+                            "Show Reasoning";
+                        })()}
+                      </span>
+                    </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <ReactMarkdown>
@@ -195,14 +205,7 @@ export default function MiddlePanel() {
           </Item>
         ))}
         {showTypingIndicator && (
-          <Item key="typing-indicator">
-            <ItemContent className="p-4 border rounded-md border-border">
-              <div className="flex items-center gap-2">
-                <Spinner className="size-4" />
-                <span className="text-muted-foreground">Assistant is thinking...</span>
-              </div>
-            </ItemContent>
-          </Item>
+          <Spinner className="m-8 mt-4" />
         )}
         {/* Spacer so the chat can be scrolled past the bottom and input doesn't overlap the last message */}
         <div className="h-36 md:h-40" />
