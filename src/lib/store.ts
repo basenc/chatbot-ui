@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { ChatData } from "./odm";
+import { Chat } from "./odm";
 
 export function createStore<T>(initialValue: T) {
   let state = initialValue;
@@ -20,5 +20,5 @@ export function createStore<T>(initialValue: T) {
   };
 }
 
-export const chatIDStore = createStore<number | null>(null);
-export const chatsStore = createStore<Array<ChatData>>([]);
+export const chatIDStore = createStore<string | null>(null);
+export const chatsStore = createStore<Array<Chat>>([]);

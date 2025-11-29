@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useEffect, useSyncExternalStore } from "react";
-import { ChatModel } from '../../prisma/prisma/models/Chat';
-
 import { SidebarProvider } from "@/components/ui/sidebar";
 import {
   Sidebar,
@@ -14,84 +12,49 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { chatStore, chatsStore } from "@/lib/store";
+import { chatIDStore, chatsStore } from "@/lib/store";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
+import { chatsCache } from "@/lib/odm";
+import { Chat } from "@/lib/odm";
+import ToastErrDetail from "./ToastErrDetail";
 
 export default function LeftPanel() {
   const [open, setOpen] = React.useState(true);
   const chats = useSyncExternalStore(chatsStore.subscribe, chatsStore.getSnapshot, chatsStore.getServerSnapshot);
-  const currentChatId = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot, chatStore.getServerSnapshot);
+  const currentChatId = useSyncExternalStore(chatIDStore.subscribe, chatIDStore.getSnapshot, chatIDStore.getServerSnapshot);
 
   useEffect(() => {
-    fetch("/api/chats")
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch chats: ${res.status}`);
-        return res.json();
-      })
-      .then((data) => chatsStore.set(data))
-      .catch((err) => console.error("Failed to fetch chats", err));
+    chatsStore.set(Array.from(chatsCache.values()));
   }, []);
 
   const handleNewChat = async () => {
-    const existingEphemeral = chats.find(chat => chat.id < 0);
-    if (existingEphemeral) {
-      chatStore.set(existingEphemeral.id);
-      return;
+    try {
+      const chat = new Chat({ name: "New Chat", messages: [], metadata: {} });
+      chatsStore.set([...chats, chat]);
+      chatIDStore.set(chat.id);
+    } catch (error) {
+      console.error("Failed to create new chat:", error);
+      ToastErrDetail({ mes: "Failed to create new chat.", error: String(error) });
     }
-    const tempId = -Date.now();
-    const ephemeral = {
-      id: tempId,
-      name: 'New Chat',
-      content: [],
-      metadata: { ephemeral: true },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as ChatModel;
-    const next = [...chatsStore.getSnapshot(), ephemeral];
-    chatsStore.set(next);
-    chatStore.set(ephemeral.id);
   };
 
-  const handleDeleteChat = async (chatId: number) => {
+  const handleDeleteChat = async (chatId: string) => {
     try {
-      if (chatId < 0) {
-        // ephemeral chat - remove from global store
-        chatsStore.set(chatsStore.getSnapshot().filter(chat => chat.id !== chatId));
-      } else {
-        await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
-        chatsStore.set(chatsStore.getSnapshot().filter(chat => chat.id !== chatId));
-      }
-      if (currentChatId === chatId) {
-        chatStore.set(null);
+      const chat = chats.find(c => c.id === chatId);
+      if (chat) {
+        chat.delete();
+        const updatedChats = chats.filter(c => c.id !== chatId);
+        chatsStore.set(updatedChats);
+        if (updatedChats.length > 0) {
+          chatIDStore.set(updatedChats[0].id);
+        } else {
+          chatIDStore.set(null);
+        }
       }
     } catch (error) {
-      console.error('Failed to delete chat:', error);
-    }
-  };
-
-  const handleRenameChat = async (chatId: number) => {
-    const newName = prompt('Enter new name for the chat:');
-    if (newName && newName.trim()) {
-      try {
-        if (chatId < 0) {
-          // ephemeral - rename locally
-          chatsStore.set(chatsStore.getSnapshot().map(chat =>
-            chat.id === chatId ? { ...chat, name: newName.trim() } : chat
-          ));
-        } else {
-          await fetch(`/api/chats/${chatId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newName.trim() })
-          });
-          chatsStore.set(chatsStore.getSnapshot().map((chat) =>
-            chat.id === chatId ? { ...chat, name: newName.trim() } : chat
-          ));
-        }
-      } catch (error) {
-        console.error('Failed to rename chat:', error);
-      }
+      console.error("Failed to delete chat:", error);
+      ToastErrDetail({ mes: "Failed to delete chat.", error: String(error) });
     }
   };
 
@@ -106,11 +69,11 @@ export default function LeftPanel() {
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             <SidebarGroupContent className="flex flex-col gap-2">
               {chats.map((chat) => (
-                <div key={chat.id} className="flex items-center">
+                <div key={String(chat.id)} className="flex items-center">
                   <Button
                     variant={currentChatId === chat.id ? "secondary" : "ghost"}
                     className="flex-1 justify-start"
-                    onClick={() => chatStore.set(chat.id)}
+                    onClick={() => chatIDStore.set(String(chat.id))}
                   >
                     {chat.name || "Untitled Chat"}
                   </Button>
@@ -121,10 +84,7 @@ export default function LeftPanel() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => handleRenameChat(chat.id)}>
-                        Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeleteChat(chat.id)} variant="destructive">
+                      <DropdownMenuItem onClick={() => handleDeleteChat(String(chat.id))} variant="destructive">
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>

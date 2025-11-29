@@ -5,7 +5,7 @@ const DB_NAME = "chatbot_ui";
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
 function openDB(): Promise<IDBDatabase | null> {
-  if (typeof window === 'undefined' || !('indexedDB' in window)) throw new Error('IndexedDB is not available in this environment');
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve(null);
 
   if (dbPromise) return dbPromise;
 

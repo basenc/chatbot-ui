@@ -10,6 +10,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown, RefreshCw } from 'lucide-react';
 // cn utility not used in this file
 import { toast } from 'sonner';
+import { getOAIModelsList } from '@/lib/utils';
+import { settingsCache, Setting } from '@/lib/odm';
 
 interface ModelSelectorProps {
   value: string;
@@ -66,59 +68,42 @@ function ModelSelector({ value, onChange, open, onOpenChange, models, placeholde
 }
 
 export default function RightPanel() {
-  const [apiBase, setApiBase] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('');
-  const [taskModel, setTaskModel] = useState('');
+  const [apiBase, setApiBase] = useState(() => {
+    const setting = settingsCache.get("openai_api_base");
+    return typeof setting?.value === 'string' ? setting.value : '';
+  });
+  const [apiKey, setApiKey] = useState(() => {
+    const setting = settingsCache.get("openai_api_key");
+    return typeof setting?.value === 'string' ? setting.value : '';
+  });
+  const [model, setModel] = useState(() => {
+    const setting = settingsCache.get("openai_model");
+    return typeof setting?.value === 'string' ? setting.value : '';
+  });
+  const [taskModel, setTaskModel] = useState(() => {
+    const setting = settingsCache.get("openai_task_model");
+    return typeof setting?.value === 'string' ? setting.value : '';
+  });
   const [open, setOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   // models returned from /api/models may include a `name` property for display.
   // We store the array items with `id` (value used for selection) and optional `name`.
   const [models, setModels] = useState<{ id: string; name?: string; object?: string }[]>([]);
 
-  const fetchModels = useCallback(() => {
+  const fetchModels = useCallback(async () => {
     if (apiKey && apiBase) {
-      fetch('/api/models')
-        .then((res) => res.json())
-        .then((data) => {
-          // Normalize the model objects to ensure { id, name? }
-          if (Array.isArray(data)) {
-            const normalized = data.map((m: unknown) => {
-              if (m && typeof m === 'object') {
-                const mm = m as Record<string, unknown>;
-                const idVal = mm.id ?? mm.model ?? mm.name ?? '';
-                const id = String(idVal ?? '');
-                const nameVal = mm.name ?? mm.id ?? mm.model;
-                const name = nameVal == null ? undefined : String(nameVal);
-                return { id, name };
-              }
-              return { id: '', name: undefined };
-            }).filter((x) => x.id);
-            setModels(normalized);
-          } else {
-            setModels([]);
-          }
-        })
-        .catch((_err) => {
-          console.error('Failed to fetch models', _err);
-          setModels([]);
-        });
+      try {
+        const modelsList = await getOAIModelsList();
+        const normalized = modelsList.data.map(m => ({ id: m.id, name: m.id }));
+        setModels(normalized);
+      } catch (err) {
+        console.error('Failed to fetch models', err);
+        setModels([]);
+      }
     } else {
       setModels([]);
     }
   }, [apiKey, apiBase]);
-
-  useEffect(() => {
-    fetch('/api/settings')
-      .then(res => res.json())
-      .then(settings => {
-        setApiBase(settings.openai_api_base || '');
-        setApiKey(settings.openai_api_key || '');
-        setModel(settings.openai_model || '');
-        setTaskModel(settings.openai_task_model || '');
-      })
-      .catch(err => console.error('Failed to fetch settings', err));
-  }, []);
 
   useEffect(() => {
     if (apiKey && apiBase) {
@@ -129,21 +114,31 @@ export default function RightPanel() {
 
   const handleSave = async () => {
     try {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          openai_api_base: apiBase,
-          openai_api_key: apiKey,
-          openai_model: model,
-          openai_task_model: taskModel
-        })
-      });
-      if (response.ok) {
-        toast.success('Settings saved successfully!');
+      const baseSetting = settingsCache.get("openai_api_base");
+      if (baseSetting) {
+        await baseSetting.update({ value: apiBase });
       } else {
-        toast.error('Failed to save settings.');
+        new Setting("openai_api_base", apiBase);
       }
+      const keySetting = settingsCache.get("openai_api_key");
+      if (keySetting) {
+        await keySetting.update({ value: apiKey });
+      } else {
+        new Setting("openai_api_key", apiKey);
+      }
+      const modelSetting = settingsCache.get("openai_model");
+      if (modelSetting) {
+        await modelSetting.update({ value: model });
+      } else {
+        new Setting("openai_model", model);
+      }
+      const taskModelSetting = settingsCache.get("openai_task_model");
+      if (taskModelSetting) {
+        await taskModelSetting.update({ value: taskModel });
+      } else {
+        new Setting("openai_task_model", taskModel);
+      }
+      toast.success('Settings saved successfully!');
     } catch {
       toast.error('Failed to save settings.');
     }

@@ -8,12 +8,6 @@ export type ContentPart =
   | { type: "file"; file: { filename?: string; fileData?: string } };
 export type MessageContent = string | ContentPart[]
 
-export type Attachment =
-  | { image_url: { url?: string } }
-  | { video_url: { url?: string } }
-  | { input_audio: { data?: string; format?: string } }
-  | { file: { filename?: string; fileData?: string } };
-
 export type Message = Partial<Omit<OpenAI.Chat.ChatCompletionMessageParam, 'content'>> & {
   content?: MessageContent;
   images?: Attachment[];
