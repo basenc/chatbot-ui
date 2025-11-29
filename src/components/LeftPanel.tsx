@@ -18,6 +18,7 @@ import { MoreHorizontal } from "lucide-react";
 import { chatsCache } from "@/lib/odm";
 import { Chat } from "@/lib/odm";
 import ToastErrDetail from "./ToastErrDetail";
+import bip39Words from "@/lib/bip39.json";
 
 export default function LeftPanel() {
   const [open, setOpen] = React.useState(true);
@@ -30,7 +31,7 @@ export default function LeftPanel() {
 
   const handleNewChat = async () => {
     try {
-      const chat = new Chat({ name: "New Chat", messages: [], metadata: {} });
+      const chat = new Chat({ name: generateChatName(), messages: [], metadata: {} });
       chatsStore.set([...chats, chat]);
       chatIDStore.set(chat.id);
     } catch (error) {
@@ -57,6 +58,12 @@ export default function LeftPanel() {
       ToastErrDetail({ mes: "Failed to delete chat.", error: String(error) });
     }
   };
+
+  function generateChatName(): string {
+    const word1 = bip39Words[Math.floor(Math.random() * bip39Words.length)];
+    const word2 = bip39Words[Math.floor(Math.random() * bip39Words.length)];
+    return `${word1} ${word2}`;
+  }
 
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>

@@ -49,15 +49,33 @@ export default function MiddlePanel() {
     } else {
       setTimeout(() => setMessages([]), 0);
     }
+    setShowTypingIndicator(false);
+    setIsStreaming(false);
+    messagesRef.current = [];
   }, [currentChatId]);
 
   const handleSend = async () => {
     if (isStreaming || (!input.content && input.images?.length === 0) || currentChatId == null) return;
 
+    const chat = chatsCache.get(String(currentChatId));
+    if (!chat) throw new Error(`Chat with id ${currentChatId} not found`);
+
     messagesRef.current = [...messagesRef.current, input];
 
     setMessages(messagesRef.current);
     setInput({ content: "", images: [], role: "user" });
+
+    if (messagesRef.current.length === 1) {
+      (async () => {
+        const nameMessages: Message[] = [{ role: "user", content: `Generate a short, descriptive name for this chat based on the following user message: ${input.content}` }];
+        const nameResponse = chatCompletion(nameMessages, true);
+        let generatedName = "";
+        for await (const delta of nameResponse) {
+          if (delta.content) generatedName += delta.content;
+        }
+        chat.update({ name: generatedName.trim() });
+      })();
+    }
 
     setShowTypingIndicator(true);
     setIsStreaming(true);
@@ -84,10 +102,7 @@ export default function MiddlePanel() {
 
       setIsStreaming(false);
 
-      const chat = chatsCache.get(String(currentChatId));
-      if (chat) {
-        chat.update({ messages: messagesRef.current });
-      }
+      chat.update({ messages: messagesRef.current });
     } catch (error) {
       console.error("Send failed:", error);
       toast.error("Failed to send message");
