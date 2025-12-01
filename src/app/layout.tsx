@@ -20,14 +20,21 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
+const isProd = process.env.NODE_ENV === "production";
+const basePath = isProd ? "/chatbot-ui" : "";
+
 export const metadata: Metadata = {
   title: "Chatbot UI",
   description: "A modern chatbot interface",
-  manifest: "/manifest.json",
+  manifest: `${basePath}/manifest.json`,
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Chatbot UI",
+  },
+  icons: {
+    icon: `${basePath}/icon.svg`,
+    apple: `${basePath}/apple-icon.png`,
   },
 };
 

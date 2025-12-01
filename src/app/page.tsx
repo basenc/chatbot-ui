@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -11,11 +11,19 @@ const MiddlePanel = dynamic(() => import('@/components/MiddlePanel'), { ssr: fal
 const LeftPanel = dynamic(() => import('@/components/LeftPanel'), { ssr: false });
 const RightPanel = dynamic(() => import('@/components/RightPanel'), { ssr: false });
 
+const basePath = process.env.NODE_ENV === "production" ? "/chatbot-ui" : "";
+
 export default function Home() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [leftSheetOpen, setLeftSheetOpen] = useState(false);
   const [rightSheetOpen, setRightSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register(`${basePath}/sw.js`);
+    }
+  }, []);
 
   return (
     <div className="h-screen w-screen flex flex-col">
