@@ -79,26 +79,28 @@ export default function LeftPanel() {
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             <SidebarGroupContent className="flex flex-col gap-2">
               {chats.map((chat) => (
-                <div key={String(chat.id)} className="flex items-center">
+                <div key={String(chat.id)} className="group/chat relative">
                   <Button
                     variant={currentChatId === chat.id ? "secondary" : "ghost"}
-                    className="flex-1 justify-start"
+                    className="w-full justify-start"
                     onClick={() => chatIDStore.set(String(chat.id))}
                   >
-                    {chat.name || "Untitled Chat"}
+                    <span className="truncate">{chat.name || "Untitled Chat"}</span>
                   </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => handleDeleteChat(String(chat.id))} variant="destructive">
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="absolute bottom-1 right-1 opacity-0 group-hover/chat:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleDeleteChat(String(chat.id))} variant="destructive">
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               ))}
             </SidebarGroupContent>

@@ -13,7 +13,7 @@ import "katex/dist/katex.min.css";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Image from "next/image";
 import MermaidRenderer from "./MermaidRenderer";
-import ImageWithPlaceholder from "./ImageWithPlaceholder";
+import MediaPreview from "./MediaPreview";
 
 interface MarkdownRendererProps {
   content: string;
@@ -113,7 +113,10 @@ export default function MarkdownRenderer({ content, className }: MarkdownRendere
           li: ({ children, ...props }) => (
             <li {...props}>{children}</li>
           ),
-          img: (props) => <ImageWithPlaceholder {...props} />,
+          img: ({ src }) => {
+            if (!src || typeof src !== 'string') return null;
+            return <MediaPreview attachment={{ image_url: { url: src } }} />;
+          },
           a: ({ href, children, ...props }) => {
             let faviconUrl = null;
             try {

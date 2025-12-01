@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-// card components removed — not used in this panel
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Check, ChevronsUpDown, RefreshCw } from 'lucide-react';
-// cn utility not used in this file
-import { toast } from 'sonner';
 import { getOAIModelsList } from '@/lib/utils';
 import { settingsCache, Setting } from '@/lib/odm';
+import { SidebarProvider } from "@/components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 
 interface ModelSelectorProps {
   value: string;
@@ -86,9 +93,17 @@ export default function RightPanel() {
   });
   const [open, setOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
-  // models returned from /api/models may include a `name` property for display.
-  // We store the array items with `id` (value used for selection) and optional `name`.
   const [models, setModels] = useState<{ id: string; name?: string; object?: string }[]>([]);
+  const initializedRef = useRef(false);
+
+  const saveSetting = useCallback(async (key: string, value: string) => {
+    const setting = settingsCache.get(key);
+    if (setting) {
+      await setting.update({ value });
+    } else {
+      new Setting(key, value);
+    }
+  }, []);
 
   const fetchModels = useCallback(async () => {
     if (apiKey && apiBase) {
@@ -106,92 +121,108 @@ export default function RightPanel() {
   }, [apiKey, apiBase]);
 
   useEffect(() => {
-    if (apiKey && apiBase) {
-      // eslint-disable-next-line
-      fetchModels();
+    if (!initializedRef.current && apiKey && apiBase) {
+      initializedRef.current = true;
+      const controller = new AbortController();
+      getOAIModelsList().then(modelsList => {
+        if (!controller.signal.aborted) {
+          setModels(modelsList.data.map(m => ({ id: m.id, name: m.id })));
+        }
+      }).catch(err => {
+        if (!controller.signal.aborted) {
+          console.error('Failed to fetch models', err);
+          setModels([]);
+        }
+      });
+      return () => controller.abort();
     }
-  }, [apiKey, apiBase, fetchModels]);
+  }, [apiKey, apiBase]);
 
-  const handleSave = async () => {
-    try {
-      const baseSetting = settingsCache.get("openai_api_base");
-      if (baseSetting) {
-        await baseSetting.update({ value: apiBase });
-      } else {
-        new Setting("openai_api_base", apiBase);
-      }
-      const keySetting = settingsCache.get("openai_api_key");
-      if (keySetting) {
-        await keySetting.update({ value: apiKey });
-      } else {
-        new Setting("openai_api_key", apiKey);
-      }
-      const modelSetting = settingsCache.get("openai_model");
-      if (modelSetting) {
-        await modelSetting.update({ value: model });
-      } else {
-        new Setting("openai_model", model);
-      }
-      const taskModelSetting = settingsCache.get("openai_task_model");
-      if (taskModelSetting) {
-        await taskModelSetting.update({ value: taskModel });
-      } else {
-        new Setting("openai_task_model", taskModel);
-      }
-      toast.success('Settings saved successfully!');
-    } catch {
-      toast.error('Failed to save settings.');
-    }
+  const handleApiBaseChange = (value: string) => {
+    setApiBase(value);
+  };
+
+  const handleApiBaseSave = () => {
+    saveSetting("openai_api_base", apiBase);
+  };
+
+  const handleApiKeyChange = (value: string) => {
+    setApiKey(value);
+  };
+
+  const handleApiKeySave = () => {
+    saveSetting("openai_api_key", apiKey);
+  };
+
+  const handleModelChange = (value: string) => {
+    setModel(value);
+    saveSetting("openai_model", value);
+  };
+
+  const handleTaskModelChange = (value: string) => {
+    setTaskModel(value);
+    saveSetting("openai_task_model", value);
   };
 
   return (
-    <div className="flex flex-col gap-2 p-2">
-      <Label htmlFor="api-base">API Base</Label>
-      <Input
-        id="api-base"
-        value={apiBase}
-        onChange={(e) => setApiBase(e.target.value)}
-        onBlur={fetchModels}
-        placeholder="https://api.openai.com/v1"
-      />
-      <Label htmlFor="api-key">API Key</Label>
-      <Input
-        id="api-key"
-        type="password"
-        value={apiKey}
-        onChange={(e) => setApiKey(e.target.value)}
-        onBlur={fetchModels}
-        placeholder="sk-..."
-      />
-      <Label htmlFor="model">Model</Label>
-      <div className="flex flex-row gap-2">
-        <ModelSelector
-          value={model}
-          onChange={setModel}
-          open={open}
-          onOpenChange={setOpen}
-          models={models}
-          placeholder="Select model..."
-        />
-        <Button variant="outline" onClick={fetchModels} className="w-min h-min">
-          <RefreshCw />
-        </Button>
-      </div>
-      <Label htmlFor="task-model">Task Model</Label>
-      <div className="flex flex-row gap-2">
-        <ModelSelector
-          value={taskModel}
-          onChange={setTaskModel}
-          open={taskOpen}
-          onOpenChange={setTaskOpen}
-          models={models}
-          placeholder="Select task model..."
-        />
-        <Button variant="outline" onClick={fetchModels} className="w-min h-min">
-          <RefreshCw />
-        </Button>
-      </div>
-      <Button onClick={handleSave}>Save Settings</Button>
-    </div>
+    <SidebarProvider open={true}>
+      <Sidebar collapsible="none" className="w-full min-h-screen max-h-screen" side="right">
+        <SidebarHeader>
+          <SidebarGroupLabel>Settings</SidebarGroupLabel>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent className="flex flex-col gap-2 p-2">
+              <Label htmlFor="api-base">API Base</Label>
+              <Input
+                id="api-base"
+                value={apiBase}
+                onChange={(e) => handleApiBaseChange(e.target.value)}
+                onBlur={handleApiBaseSave}
+                placeholder="https://api.openai.com/v1"
+              />
+              <Label htmlFor="api-key">API Key</Label>
+              <Input
+                id="api-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => handleApiKeyChange(e.target.value)}
+                onBlur={handleApiKeySave}
+                placeholder="sk-..."
+              />
+              <Label htmlFor="model">Model</Label>
+              <div className="flex flex-row gap-2">
+                <ModelSelector
+                  value={model}
+                  onChange={handleModelChange}
+                  open={open}
+                  onOpenChange={setOpen}
+                  models={models}
+                  placeholder="Select model..."
+                />
+                <Button variant="outline" size="icon" onClick={fetchModels}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              <Label htmlFor="task-model">Task Model</Label>
+              <div className="flex flex-row gap-2">
+                <ModelSelector
+                  value={taskModel}
+                  onChange={handleTaskModelChange}
+                  open={taskOpen}
+                  onOpenChange={setTaskOpen}
+                  models={models}
+                  placeholder="Select task model..."
+                />
+                <Button variant="outline" size="icon" onClick={fetchModels}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter />
+      </Sidebar>
+    </SidebarProvider>
   );
 };
