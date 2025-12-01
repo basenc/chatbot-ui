@@ -2,14 +2,14 @@
   "name": "Chatbot UI",
   "short_name": "Chat",
   "description": "A modern chatbot interface",
-  "start_url": "/",
+  "start_url": "/chatbot-ui/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/chatbot-ui/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
