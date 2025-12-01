@@ -122,6 +122,10 @@ export default function RightPanel() {
 
   useEffect(() => {
     if (!initializedRef.current && apiKey && apiBase) {
+      const cachedKey = settingsCache.get("openai_api_key");
+      const cachedBase = settingsCache.get("openai_api_base");
+      if (!cachedKey?.value || !cachedBase?.value) return;
+
       initializedRef.current = true;
       const controller = new AbortController();
       getOAIModelsList().then(modelsList => {
