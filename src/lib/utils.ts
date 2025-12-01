@@ -97,12 +97,18 @@ export async function* chatCompletion(messages: Message[], isTaskModel = false, 
   }
 }
 
-export function getOAIModelsList() {
+export function getOAIModelsList(): Promise<{ data: { id: string }[] }> {
   const openai_api_key = settingsCache.get("openai_api_key");
   const openai_api_base = settingsCache.get("openai_api_base");
 
-  if (!openai_api_key?.value || typeof openai_api_key.value !== 'string') throw new Error("OpenAI API key is not set");
-  if (!openai_api_base?.value || typeof openai_api_base.value !== 'string') throw new Error("OpenAI API base URL is not set");
+  const emptyResult: { data: { id: string }[] } = { data: [] };
+
+  if (!openai_api_key?.value || typeof openai_api_key.value !== 'string') {
+    return Promise.resolve(emptyResult);
+  }
+  if (!openai_api_base?.value || typeof openai_api_base.value !== 'string') {
+    return Promise.resolve(emptyResult);
+  }
 
   const openai = new OpenAI({
     dangerouslyAllowBrowser: true,
