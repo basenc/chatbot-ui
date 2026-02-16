@@ -273,8 +273,11 @@ export default function MiddlePanel() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full w-full">
-      <ScrollArea className="overflow-hidden">
+    <>
+      {/* Dont overlap top buttons */}
+      <div className="h-6" />
+      {/* Messages */}
+      <div className="overflow-scroll w-full h-full">
         {messages.map((msg, idx) => (
           <MessageItem
             key={idx}
@@ -297,8 +300,8 @@ export default function MiddlePanel() {
           <Spinner className="m-8 mt-4" />
         )}
         {/* Spacer so the chat can be scrolled past the bottom and input doesn't overlap the last message */}
-        <div className="h-36" />
-      </ScrollArea>
+        <div className="h-100" />
+      </div>
       <ChatInput
         input={input}
         isStreaming={isStreaming}
@@ -309,6 +312,6 @@ export default function MiddlePanel() {
         onPaste={handlePaste}
         onRemoveAttachment={handleRemoveInputAttachment}
       />
-    </div>
-  );
+  </>
+);
 }

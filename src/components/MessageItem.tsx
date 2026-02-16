@@ -64,20 +64,18 @@ function MessageItem({
 
   return (
     <Item
-      className={`group flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+      className={`${msg.role === "user" ? "justify-end" : "justify-start"}`}
     >
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <ItemContent
-            className={`p-4 rounded-2xl w-full max-w-full sm:max-w-[90%] md:max-w-[75%] lg:max-w-[65%] xl:max-w-[55%] 2xl:max-w-[45%] min-w-0 grow-0 shrink basis-auto overflow-hidden ${msg.role === "user" ? "bg-secondary" : "bg-muted"}`}
-          >
-            {/* Reasoning Section - hidden when editing */}
+          <ItemContent className="bg-muted p-4 rounded-2xl max-w-[90%]">
+            {/* Reasoning */}
             {!isEditing && msg.reasoning && msg.reasoning.length > 0 && (
               <Collapsible defaultOpen={!isStreaming}>
                 <CollapsibleTrigger className="w-full text-left text-sm text-muted-foreground mb-2">
                   <div className="flex items-center justify-between">
                     <span>
-                      {isContentEmpty() && (!msg.images || msg.images.length === 0)
+                      {isContentEmpty()
                         ? msg.reasoning.trim().split("\n").slice(-1)[0]
                         : "Show Reasoning"}
                     </span>
@@ -91,7 +89,7 @@ function MessageItem({
 
             {/* Edit Mode */}
             {isEditing && editingMessage ? (
-              <div className="flex flex-col gap-2 w-full">
+              <div className="flex flex-col gap-2">
                 <Textarea
                   value={
                     typeof editingMessage.content === "string"
@@ -99,7 +97,7 @@ function MessageItem({
                       : ""
                   }
                   onChange={(e) => onEditChange(e.target.value)}
-                  className="min-h-[100px] field-sizing-content resize-none bg-transparent border-0 p-0 focus-visible:ring-0"
+                  className="h-100 border-0 focus-visible:ring-0"
                   autoFocus
                 />
                 {editingMessage.images && editingMessage.images.length > 0 && (
@@ -129,32 +127,12 @@ function MessageItem({
               </div>
             ) : (
               <>
-                {/* Message Content */}
-                {msg.content &&
-                  (typeof msg.content === "string" ? (
-                    <MarkdownRenderer content={msg.content} />
-                  ) : (
-                    <>
-                      {(() => {
-                        const textPart = msg.content.find((c) => c.type === "text");
-                        return textPart?.text ? (
-                          <MarkdownRenderer content={textPart.text} />
-                        ) : null;
-                      })()}
-                      {msg.content
-                        .filter((c) => c.type === "image_url")
-                        .map((c, i) =>
-                          c.image_url?.url ? (
-                            <MediaPreview
-                              key={i}
-                              attachment={{ image_url: { url: c.image_url.url } }}
-                            />
-                          ) : null
-                        )}
-                    </>
-                  ))}
+                {/* Message */}
+                {msg.content && typeof msg.content === "string" && (
+                  <MarkdownRenderer content={msg.content} />
+                )}
 
-                {/* Attached Images */}
+                {/* Attachments */}
                 {msg.images && Array.isArray(msg.images) && (
                   <div className="flex flex-wrap gap-2">
                     {msg.images.map((attachment, i) => (
