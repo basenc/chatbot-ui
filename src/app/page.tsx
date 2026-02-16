@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -12,12 +12,14 @@ const LeftPanel = dynamic(() => import('@/components/LeftPanel'), { ssr: false }
 const RightPanel = dynamic(() => import('@/components/RightPanel'), { ssr: false });
 
 const basePath = process.env.NODE_ENV === "production" ? "/chatbot-ui" : "";
+const SWIPE_THRESHOLD = 50;
 
 export default function Home() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [leftSheetOpen, setLeftSheetOpen] = useState(false);
   const [rightSheetOpen, setRightSheetOpen] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -25,10 +27,28 @@ export default function Home() {
     }
   }, []);
 
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+      if (deltaX > 0 && touchStartRef.current.x < 40) {
+        setLeftSheetOpen(true);
+      } else if (deltaX < 0 && touchStartRef.current.x > window.innerWidth - 40) {
+        setRightSheetOpen(true);
+      }
+    }
+    touchStartRef.current = null;
+  }, []);
+
   return (
     <div className="h-screen w-screen flex flex-col">
       {/* Mobile layout */}
-      <div className="md:hidden h-full relative">
+      <div className="md:hidden h-full relative" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div className="absolute top-2 left-2 z-10">
           <Sheet open={leftSheetOpen} onOpenChange={setLeftSheetOpen}>
             <SheetTrigger asChild>
