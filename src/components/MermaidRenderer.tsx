@@ -9,31 +9,38 @@ interface MermaidRendererProps {
   className?: string;
 }
 
+mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+
 export default function MermaidRenderer({ chart, className }: MermaidRendererProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     let mounted = true;
+    const id = "mermaid-" + Math.random().toString(36).slice(2, 9);
+
     (async () => {
       try {
-        mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+        await mermaid.parse(chart);
         if (!mounted || !ref.current) return;
-        const id = "mermaid-" + Math.random().toString(36).slice(2, 9);
-        try {
-          const { svg } = await mermaid.render(id, chart);
-          if (mounted && ref.current) ref.current.innerHTML = svg;
-        } catch (e) {
-          console.error("Mermaid render failed", e);
+
+        const { svg } = await mermaid.render(id, chart);
+        if (mounted && ref.current) ref.current.innerHTML = svg;
+      } catch (e) {
+        console.error("Mermaid render failed", e);
+        document.getElementById(id)?.remove();
+
+        if (mounted && ref.current) {
+          ref.current.textContent = chart;
           toast.error(
             "Failed to render mermaid diagram. Displaying as plain text."
           );
-          if (mounted && ref.current) ref.current.textContent = chart;
         }
-      } catch (e) {
-        console.error("Failed to load mermaid", e);
       }
     })();
+
     return () => {
       mounted = false;
+      document.getElementById(id)?.remove();
     };
   }, [chart]);
 
