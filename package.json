@@ -62,6 +62,7 @@
     "rehype-katex": "^7.0.1",
     "rehype-mermaid": "^3.0.0",
     "rehype-raw": "^7.0.0",
+    "remark-breaks": "^4.0.0",
     "remark-emoji": "^5.0.2",
     "remark-gfm": "^4.0.1",
     "remark-mark": "^0.0.0",
