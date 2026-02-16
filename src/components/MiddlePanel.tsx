@@ -250,7 +250,7 @@ export default function MiddlePanel() {
     chat?.update({ messages: newMessages });
   }, [currentChatId]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       const file = items[i].getAsFile();
