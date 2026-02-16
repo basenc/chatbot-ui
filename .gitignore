@@ -43,3 +43,6 @@ next-env.d.ts
 /prisma/prisma
 /prisma/migrations
 *.db
+
+flake*
+!flake.nix

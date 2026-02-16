@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import Image from "next/image";
 import MermaidRenderer from "./MermaidRenderer";
 import MediaPreview from "./MediaPreview";
+import { cn } from "@/lib/utils";
 
 interface MarkdownRendererProps {
   content: string;
@@ -22,7 +23,7 @@ interface MarkdownRendererProps {
 
 export default function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={className}>
+    <div className={cn("wrap-break-word", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath, remarkEmoji]}
         rehypePlugins={[rehypeHighlight, rehypeKatex, rehypeRaw]}
@@ -45,37 +46,49 @@ export default function MarkdownRenderer({ content, className }: MarkdownRendere
           h6: ({ ...props }) => (
             <h6 {...props} className="text-lg font-bold mb-2 mt-2" />
           ),
-          pre: ({ children, ...props }) => {
-            if (
-              React.isValidElement(children) &&
-              children.type === "code" &&
-              (
-                children.props as { className?: string }
-              ).className?.includes("language-mermaid")
-            ) {
-              return (
-                <MermaidRenderer
-                  chart={String(
-                    (children.props as { children: React.ReactNode })
-                      .children
-                  )}
-                />
-              );
+          pre: ({ children, className, ...props }) => {
+            const extractText = (child: any): string => {
+              if (typeof child === 'string') return child;
+              if (Array.isArray(child)) return child.map(extractText).join('');
+              if (child?.props?.children) return extractText(child.props.children);
+              return '';
+            };
+
+            if (React.isValidElement(children) && (children.props as any)?.className?.includes("language-mermaid")) {
+              return <MermaidRenderer chart={extractText(children)} />;
             }
-            return (
-              <pre {...props} className="p-4 bg-muted rounded-md">
-                {children}
-              </pre>
-            );
+
+            if (React.isValidElement(children) && (children.props as any)?.className?.includes("language-html")) {
+              return (
+              <iframe
+                className="border rounded-md w-full"
+                srcDoc={extractText(children)}
+                sandbox="allow-scripts allow-same-origin"
+                onLoad={(e) => {
+                  const iframe = e.currentTarget;
+                  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                  if (doc) {
+                    iframe.style.height = Math.min(
+                      doc.documentElement.scrollHeight,
+                      640
+                    ) + "px";
+                  }
+                }}
+              />
+              );
+            };
+
+            return <pre className="mt-2 p-2 w-full">{children}</pre>;
           },
           code: ({ children, className, ...props }) => {
-            if (className?.includes("language-mermaid")) {
-              return <MermaidRenderer chart={String(children)} />;
-            }
-            return <code {...props}>{children}</code>;
+            return <code className={cn(`p-1 bg-card rounded-md ${className || "language-text"}`, className)} {...props}>
+              {children}
+            </code>;
           },
           table: ({ children, ...props }) => (
-            <Table {...props}>{children}</Table>
+            <div className="overflow-x-scroll">
+              <Table {...props}>{children}</Table>
+            </div>
           ),
           thead: ({ children, ...props }) => (
             <TableHeader {...props}>{children}</TableHeader>

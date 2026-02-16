@@ -5,11 +5,11 @@ import React, {
   useEffect,
   useSyncExternalStore,
   useRef,
+  useCallback,
 } from "react";
 import { ScrollArea } from "./ui/scroll-area";
-import { chatIDStore } from "@/lib/store";
-import { toast } from "sonner";
-import { chatsCache } from "@/lib/odm";
+import { chatIDStore, chatsStore } from "@/lib/store";
+import { chatsCache, Chat } from "@/lib/odm";
 import { Spinner } from "./ui/spinner";
 import { Message } from "@/types/openai";
 import { chatCompletion, prepareMessagesForAPI, trimObject, generateChatName } from "@/lib/utils";
@@ -48,13 +48,25 @@ export default function MiddlePanel() {
   const handleSend = async () => {
     if (isStreaming || (!input.content && input.images?.length === 0)) return;
 
-    if (!currentChatId) {
-      toast.error("Select or create a chat first");
-      return;
-    }
+    let chat = currentChatId ? chatsCache.get(String(currentChatId)) : null;
 
-    const chat = chatsCache.get(String(currentChatId));
-    if (!chat) throw new Error(`Chat with id ${currentChatId} not found`);
+    if (!chat) {
+      const newChat = new Chat({ name: "New Chat", messages: [], metadata: {} }, {
+        onCreated: (id) => {
+          chatsStore.set([...chatsStore.getSnapshot(), newChat]);
+          chatIDStore.set(id);
+        }
+      });
+      chat = newChat;
+      await new Promise<void>(resolve => {
+        const unsubscribe = chatIDStore.subscribe(() => {
+          if (chatIDStore.getSnapshot()) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+    }
 
     messagesRef.current = [...messagesRef.current, input];
 
@@ -64,7 +76,7 @@ export default function MiddlePanel() {
     if (messagesRef.current.length === 1) {
       (async () => {
         const generatedName = await generateChatName(typeof input.content === 'string' ? input.content : '');
-        chat.update({ name: generatedName });
+        chat?.update({ name: generatedName });
       })();
     }
 
@@ -119,7 +131,7 @@ export default function MiddlePanel() {
     }
   };
 
-  const createAttachment = (file: File, dataUrl: string) => {
+  const createAttachment = useCallback((file: File, dataUrl: string) => {
     const type = file.type;
     if (type.startsWith('image/')) {
       return { image_url: { url: dataUrl } };
@@ -130,9 +142,9 @@ export default function MiddlePanel() {
     } else {
       return { file: { filename: file.name, fileData: dataUrl } };
     }
-  };
+  }, []);
 
-  const addAttachmentFromFile = (file: File) => {
+  const addAttachmentFromFile = useCallback((file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
@@ -141,9 +153,9 @@ export default function MiddlePanel() {
       }
     };
     reader.readAsDataURL(file);
-  };
+  }, [createAttachment]);
 
-  const handleAttach = () => {
+  const handleAttach = useCallback(() => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.onchange = async () => {
@@ -153,15 +165,15 @@ export default function MiddlePanel() {
       }
     };
     fileInput.click();
-  };
+  }, [addAttachmentFromFile]);
 
-  const handleEdit = (idx: number) => {
-    const msg = messages[idx];
+  const handleEdit = useCallback((idx: number) => {
+    const msg = messagesRef.current[idx];
     setEditingIdx(idx);
     setEditingMessage({ ...msg, images: msg.images ? [...msg.images] : [] });
-  };
+  }, []);
 
-  const handleEditSave = () => {
+  const handleEditSave = useCallback(() => {
     if (editingIdx === null || !editingMessage) return;
     const newMessages = [...messages];
     newMessages[editingIdx] = editingMessage;
@@ -171,14 +183,14 @@ export default function MiddlePanel() {
     chat?.update({ messages: newMessages });
     setEditingIdx(null);
     setEditingMessage(null);
-  };
+  }, [editingIdx, editingMessage, messages, currentChatId]);
 
-  const handleEditCancel = () => {
+  const handleEditCancel = useCallback(() => {
     setEditingIdx(null);
     setEditingMessage(null);
-  };
+  }, []);
 
-  const handleEditAddAttachment = () => {
+  const handleEditAddAttachment = useCallback(() => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.onchange = () => {
@@ -199,46 +211,46 @@ export default function MiddlePanel() {
       }
     };
     fileInput.click();
-  };
+  }, [createAttachment]);
 
-  const handleEditRemoveAttachment = (imgIdx: number) => {
+  const handleEditRemoveAttachment = useCallback((imgIdx: number) => {
     setEditingMessage(prev => prev ? {
       ...prev,
       images: (prev.images || []).filter((_, i) => i !== imgIdx)
     } : null);
-  };
+  }, []);
 
-  const handleStop = () => {
+  const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-  };
+  }, []);
 
-  const handleRegenerate = async (idx: number) => {
+  const handleRegenerate = useCallback(async (idx: number) => {
     if (isStreaming) return;
 
     const chat = chatsCache.get(String(currentChatId));
     if (!chat) return;
 
-    const msg = messages[idx];
+    const msg = messagesRef.current[idx];
     const messagesToKeep = msg.role === "user"
-      ? messages.slice(0, idx + 1)
-      : messages.slice(0, idx);
+      ? messagesRef.current.slice(0, idx + 1)
+      : messagesRef.current.slice(0, idx);
     messagesRef.current = messagesToKeep;
     setMessages(messagesToKeep);
 
     await streamResponse(chat);
-  };
+  }, [isStreaming, currentChatId]);
 
-  const handleDelete = (idx: number) => {
-    const newMessages = messages.filter((_, i) => i !== idx);
+  const handleDelete = useCallback((idx: number) => {
+    const newMessages = messagesRef.current.filter((_, i) => i !== idx);
     setMessages(newMessages);
     messagesRef.current = newMessages;
     const chat = chatsCache.get(String(currentChatId));
     chat?.update({ messages: newMessages });
-  };
+  }, [currentChatId]);
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       const file = items[i].getAsFile();
@@ -246,19 +258,26 @@ export default function MiddlePanel() {
         addAttachmentFromFile(file);
       }
     }
-  };
+  }, [addAttachmentFromFile]);
 
-  const handleRemoveInputAttachment = (idx: number) => {
+  const handleRemoveInputAttachment = useCallback((idx: number) => {
     setInput(prev => ({ ...prev, images: (prev.images || []).filter((_, i) => i !== idx) }));
-  };
+  }, []);
 
-  const handleEditChange = (content: string) => {
+  const handleEditChange = useCallback((content: string) => {
     setEditingMessage(prev => prev ? { ...prev, content } : null);
-  };
+  }, []);
+
+  const handleInputChange = useCallback((content: string) => {
+    setInput(prev => ({ ...prev, content }));
+  }, []);
 
   return (
-    <div className="flex flex-col h-full relative w-full">
-      <ScrollArea className="min-h-0 h-full">
+    <>
+      {/* Dont overlap top buttons */}
+      <div className="h-6" />
+      {/* Messages */}
+      <div className="overflow-scroll w-full h-full">
         {messages.map((msg, idx) => (
           <MessageItem
             key={idx}
@@ -281,18 +300,18 @@ export default function MiddlePanel() {
           <Spinner className="m-8 mt-4" />
         )}
         {/* Spacer so the chat can be scrolled past the bottom and input doesn't overlap the last message */}
-        <div className="h-36 md:h-40" />
-      </ScrollArea>
+        <div className="h-100" />
+      </div>
       <ChatInput
         input={input}
         isStreaming={isStreaming}
-        onInputChange={(content) => setInput(prev => ({ ...prev, content }))}
+        onInputChange={handleInputChange}
         onSend={handleSend}
         onStop={handleStop}
         onAttach={handleAttach}
         onPaste={handlePaste}
         onRemoveAttachment={handleRemoveInputAttachment}
       />
-    </div>
-  );
+  </>
+);
 }
