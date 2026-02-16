@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkEmoji from "remark-emoji";
+import remarkBreaks from "remark-breaks";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeKatex from "rehype-katex";
@@ -25,7 +26,7 @@ export default function MarkdownRenderer({ content, className }: MarkdownRendere
   return (
     <div className={cn("wrap-break-word", className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkEmoji]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkBreaks]}
         rehypePlugins={[rehypeHighlight, rehypeKatex, rehypeRaw]}
         components={{
           h1: ({ ...props }) => (

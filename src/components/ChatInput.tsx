@@ -4,7 +4,7 @@ import React from "react";
 import { Send, Paperclip, Square } from "lucide-react";
 import {
   InputGroup,
-  InputGroupInput,
+  InputGroupTextarea,
   InputGroupAddon,
   InputGroupButton,
 } from "./ui/input-group";
@@ -18,7 +18,7 @@ interface ChatInputProps {
   onSend: () => void;
   onStop: () => void;
   onAttach: () => void;
-  onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => void;
+  onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   onRemoveAttachment: (idx: number) => void;
 }
 
@@ -35,9 +35,9 @@ export default function ChatInput({
   return (
     <div className="absolute bottom-0 left-0 right-0 p-4 pt-16 bg-linear-to-t from-background via-background/50 to-transparent">
       <InputGroup className="shadow-none bg-background">
-        <InputGroupInput
+        <InputGroupTextarea
           value={typeof input.content === "string" ? input.content : ""}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
             onInputChange(e.target.value)
           }
           placeholder="Type a message..."
@@ -45,6 +45,7 @@ export default function ChatInput({
           onPaste={onPaste}
           className="border-t-0"
           disabled={isStreaming}
+          rows={2}
         />
         <InputGroupAddon align="inline-end">
           <InputGroupButton size="icon-xs" onClick={onAttach} disabled={isStreaming}>
