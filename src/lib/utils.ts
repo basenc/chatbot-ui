@@ -21,36 +21,6 @@ export function trimObject(obj: any, maxLen = 80): any {
   return obj;
 };
 
-const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let bodyInfo: any = {};
-  if (init?.body && typeof init.body === 'string') {
-    try {
-      const parsed = JSON.parse(init.body);
-      bodyInfo = trimObject(parsed);
-    } catch { }
-  }
-  console.log({
-    url: input,
-    method: init?.method,
-    body: bodyInfo
-  });
-
-  try {
-    const response = await fetch(input, init);
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-    return response;
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error('Network error: Unable to connect. Check your internet connection and API base URL.');
-    }
-    throw error;
-  }
-};
-
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -80,7 +50,7 @@ export async function* chatCompletion(messages: Message[], isTaskModel = false, 
     dangerouslyAllowBrowser: true,
     apiKey: openai_api_key.value,
     baseURL: openai_api_base.value,
-    fetch: customFetch,
+    timeout: 60000,
   });
 
   const stream = await openai.chat.completions.create({
