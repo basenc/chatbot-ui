@@ -78,7 +78,7 @@ export default function LeftPanel() {
           <SidebarGroup>
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             <SidebarGroupContent className="flex flex-col gap-2">
-              {chats.map((chat) => (
+              {[...chats].reverse().map((chat) => (
                 <div key={String(chat.id)} className="group/chat relative">
                   <Button
                     variant={currentChatId === chat.id ? "secondary" : "ghost"}
