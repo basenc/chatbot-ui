@@ -80,14 +80,14 @@ export function getOAIModelsList(): Promise<{ data: { id: string }[] }> {
     return Promise.resolve(emptyResult);
   }
 
-  const openai = new OpenAI({
-    dangerouslyAllowBrowser: true,
-    apiKey: openai_api_key.value,
-    baseURL: openai_api_base.value,
-    fetch: customFetch,
-  });
-
-  return openai.models.list();
+  return fetch('/api/models', {
+    headers: {
+      'x-api-key': openai_api_key.value,
+      'x-api-base': openai_api_base.value,
+    },
+  })
+    .then(res => res.ok ? res.json() : emptyResult)
+    .catch(() => emptyResult);
 }
 
 export async function generateChatName(userMessage: string): Promise<string> {
@@ -103,7 +103,6 @@ export async function generateChatName(userMessage: string): Promise<string> {
     dangerouslyAllowBrowser: true,
     apiKey: openai_api_key.value,
     baseURL: openai_api_base.value,
-    fetch: customFetch,
   });
 
   const response = await openai.chat.completions.create({
