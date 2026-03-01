@@ -41,7 +41,12 @@ export default function ChatInput({
             onInputChange(e.target.value)
           }
           placeholder="Type a message..."
-          onKeyDown={(e) => e.key === "Enter" && !isStreaming && onSend()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !isStreaming) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
           onPaste={onPaste}
           className="border-t-0"
           disabled={isStreaming}

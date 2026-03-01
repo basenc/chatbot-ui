@@ -81,7 +81,7 @@ function MessageItem({
                     </span>
                   </div>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="mb-2">
+                <CollapsibleContent className="mb-2 overflow-x-auto max-w-full">
                   <ReactMarkdown>{msg.reasoning}</ReactMarkdown>
                 </CollapsibleContent>
               </Collapsible>

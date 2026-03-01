@@ -67,7 +67,7 @@ export default function MediaPreview({ attachment, className }: MediaPreviewProp
               src={src}
               alt="attachment"
               onError={() => setHasError(true)}
-              className={`max-w-96 max-h-96 rounded-md mt-4 mb-4 cursor-pointer ${className || ""}`}
+              className={`max-w-full max-h-96 rounded-md mt-4 mb-4 cursor-pointer ${className || ""}`}
             />
           </button>
         </DialogTrigger>
@@ -89,7 +89,7 @@ export default function MediaPreview({ attachment, className }: MediaPreviewProp
             <video
               src={src}
               onError={() => setHasError(true)}
-              className={`max-w-96 max-h-96 rounded-md mt-4 mb-4 cursor-pointer ${className || ""}`}
+              className={`max-w-full max-h-96 rounded-md mt-4 mb-4 cursor-pointer ${className || ""}`}
               muted
             />
           </button>
